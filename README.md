@@ -4,6 +4,13 @@ A daily check for newly published High and Critical security vulnerabilities, gr
 
 [Website](https://isthereacvetoday.com) 
 
+## API and RSS
+
+- [JSON snapshot](https://isthereacvetoday.com/api/today.json)
+- [RSS 2.0 feed](https://isthereacvetoday.com/api/today.rss)
+
+Subscribe to the RSS URL in any feed reader. Each High or Critical CVE has a stable GUID based on its CVE ID. The feed contains the current UTC day's entries only, uses the same snapshot as the JSON API, and returns HTTP 503 if today's data is not available. Same-day stale data remains visible and is labeled in the feed description. Poll regularly to avoid missing entries around midnight; this is not a historical feed.
+
 ## What counts?
 
 - YES means at least one CVE first published today has a CVSS v3 or v4 base score of 7.0 or higher. High starts at 7.0; Critical starts at 9.0.

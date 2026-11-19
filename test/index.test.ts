@@ -55,6 +55,43 @@ describe("HTTP handler", () => {
     });
   });
 
+  it("serves RSS from the shared snapshot without upstream requests", async () => {
+    const response = await handleRequest(new Request("https://example.com/api/today.rss"), env, ctx, now);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("application/rss+xml");
+    expect(response.headers.get("Cache-Control")).toContain("s-maxage=300");
+    expect(await response.text()).toContain('<guid isPermaLink="false">CVE-2026-1000</guid>');
+    expect(cache.put).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("serves bodyless RSS HEAD", async () => {
+    const response = await handleRequest(new Request("https://example.com/api/today.rss", { method: "HEAD" }), env, ctx, now);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("application/rss+xml");
+    expect(await response.text()).toBe("");
+  });
+
+  it.each([null, "yesterday"])("returns RSS 503 when today's data is missing: %s", async (stored) => {
+    kv.get.mockResolvedValue(stored ? buildSnapshot([], new Date("2026-11-18T23:00:00Z")) : null);
+    const response = await handleRequest(new Request("https://example.com/api/today.rss"), env, ctx, now);
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("300");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(cache.put).not.toHaveBeenCalled();
+    expect(await response.text()).not.toContain("<item>");
+  });
+
+  it("keeps stale RSS items without caching", async () => {
+    const response = await handleRequest(new Request("https://example.com/api/today.rss"), env, ctx, new Date("2026-11-19T11:00:00Z"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const xml = await response.text();
+    expect(xml).toContain("Stale snapshot");
+    expect(xml).toContain("<item>");
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+
   it("uses the edge cache before reading KV and ignores visitor query strings", async () => {
     cache.match.mockResolvedValue(new Response("cached"));
     const response = await handleRequest(new Request("https://example.com/?random=123"), env, ctx, now);
