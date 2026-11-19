@@ -50,7 +50,10 @@ export async function handleRequest(
   try {
     const cached = await caches.default.match(cacheKey);
     if (cached) {
-      return request.method === "HEAD" ? new Response(null, cached) : cached;
+      // Cache API responses can inherit the zone's longer browser TTL.
+      const headers = new Headers(cached.headers);
+      headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+      return new Response(request.method === "HEAD" ? null : cached.body, { status: cached.status, headers });
     }
   } catch (error) {
     console.warn("Edge cache read failed", error);

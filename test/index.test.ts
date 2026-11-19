@@ -63,6 +63,16 @@ describe("HTTP handler", () => {
     expect(kv.get).not.toHaveBeenCalled();
   });
 
+  it.each(["GET", "HEAD"])("revalidates browser caches even when cached %s headers carry a longer zone TTL", async (method) => {
+    cache.match.mockResolvedValue(new Response("cached", {
+      headers: { "Cache-Control": "public, max-age=14400, s-maxage=300, must-revalidate" },
+    }));
+    const response = await handleRequest(new Request("https://example.com/", { method }), env, ctx, now);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=0, must-revalidate");
+    expect(await response.text()).toBe(method === "HEAD" ? "" : "cached");
+    expect(kv.get).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])("serves a bodyless HEAD response (cache hit: %s)", async (cached) => {
     if (cached) cache.match.mockResolvedValue(new Response("cached", { headers: { "Content-Type": "text/html" } }));
     const response = await handleRequest(new Request("https://example.com/", { method: "HEAD" }), env, ctx, now);
