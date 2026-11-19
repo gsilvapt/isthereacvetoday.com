@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "is-there-a-cve-today",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-19",
+  "workers_dev": true,
+  "send_metrics": false,
+  "rules": [{ "type": "Text", "globs": ["**/*.css"], "fallthrough": true }],
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  },
+  // Wrangler creates local storage during development. Deploy provisions one namespace.
+  "kv_namespaces": [{ "binding": "CVE_STATUS" }],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
