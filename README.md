@@ -24,6 +24,8 @@ Built with TypeScript on Cloudflare Workers and KV. Pages are server-rendered HT
 
 Bug reports, category corrections, documentation fixes, and pull requests are welcome. [Open an issue](https://github.com/gsilvapt/isthereacvetoday.com/issues) or read [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and checks. Local development needs Node.js and pnpm, but no Cloudflare account.
 
+Maintainer deployment instructions are in [Deploying from GitHub](docs/deployment.md).
+
 Maintained by [gsilvapt](https://github.com/gsilvapt). [Support the project](https://ko-fi.com/gsilvapt).
 
 This product uses the NVD API but is not endorsed or certified by the NVD, nor any other company or service.

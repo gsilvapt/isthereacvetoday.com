@@ -7,6 +7,7 @@ node_modules/
 
 # Local Cloudflare state and credentials
 /.wrangler/
+/.wrangler.production-*
 .dev.vars
 .dev.vars.*
 !.dev.vars.example

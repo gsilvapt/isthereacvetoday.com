@@ -65,6 +65,10 @@ Keep the 30-minute schedule, rate-limit spacing, bounded pagination, and 24-hour
 
 The current clients cap pagination at 20 requests per feed. Changes that increase parsing, rendering, or upstream work need measurements on Cloudflare before deployment. Local response durations and successful builds do not prove production CPU compliance. Check the current [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [KV limits](https://developers.cloudflare.com/kv/platform/limits/) when changing resource use.
 
+## GitHub deployments
+
+Source changes under `src/` run checks on pull requests and deploy after a push to `main`. Changes outside `src/` do not trigger the workflow. Production deployment requires GitHub environment secrets and uses a temporary private configuration; account and namespace IDs do not belong in the tracked config. See [deployment setup](docs/deployment.md).
+
 ## Pull requests
 
 Target `main`. Explain the change, why it is needed, and how you tested it. Link related issues. Keep unrelated cleanup separate and use concise [Conventional Commit](https://www.conventionalcommits.org/) messages, such as `fix: exclude previously published CVEs`.

@@ -13,6 +13,9 @@ This is a TypeScript Cloudflare Worker that reports whether any High or Critical
 - `src/types.ts`: source record types, snapshots, freshness views, and Worker bindings.
 - `test/`: Vitest tests matching the source modules. Reuse the record factories in `test/helpers.ts` and the public fixtures in `test/fixtures/`.
 - `wrangler.jsonc`: Worker entry point, CSS text imports, the `CVE_STATUS` KV binding, and the `*/30 * * * *` cron schedule. `NVD_API_KEY` is an optional secret.
+- `scripts/deploy.ts`: environment validation, temporary private deployment config, optional runtime secret upload, and cleanup. Use `pnpm run deploy` rather than a bare Wrangler deployment.
+- `.github/workflows/deploy.yml`: checks for `src/**` changes and production deployment only after a checked push to `main`. Pull requests never receive deployment credentials.
+- `docs/deployment.md`: required GitHub secrets and local deployment setup. Keep account and namespace identifiers in environment configuration, not tracked files.
 
 ## Data invariants
 
