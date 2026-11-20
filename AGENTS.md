@@ -1,6 +1,6 @@
 # Project guide
 
-This is a TypeScript Cloudflare Worker that reports whether any High or Critical CVEs were first published today, in UTC. It serves HTML and a JSON snapshot from KV. Read [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and contribution rules.
+This is a TypeScript Cloudflare Worker that reports whether any High or Critical CVEs were first published today, in UTC. It serves HTML, JSON, and RSS from the same daily KV snapshot. Read [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and contribution rules.
 
 ## Code map
 
@@ -10,6 +10,7 @@ This is a TypeScript Cloudflare Worker that reports whether any High or Critical
 - `src/snapshot.ts`: CVSS selection, UTC-day filtering, totals, affected software labels, and freshness. The KV key is `today`.
 - `src/classify.ts`: category definitions and ordered classification rules.
 - `src/page.ts` and `src/styles.css`: escaped server-rendered HTML and inline CSS. Expandable lists use native `<details>` elements.
+- `src/rss.ts` renders RSS 2.0 items with stable CVE IDs and builds the channel and feed links from the request URL.
 - `src/types.ts`: source record types, snapshots, freshness views, and Worker bindings.
 - `test/`: Vitest tests matching the source modules. Reuse the record factories in `test/helpers.ts` and the public fixtures in `test/fixtures/`.
 - `wrangler.jsonc`: Worker entry point, CSS text imports, the `CVE_STATUS` KV binding, and the `*/30 * * * *` cron schedule. `NVD_API_KEY` is an optional secret.
@@ -32,7 +33,9 @@ This is a TypeScript Cloudflare Worker that reports whether any High or Critical
 - Only scheduled refreshes fetch upstream data. Visitor requests must not trigger refreshes or control upstream queries. The `/__scheduled` test endpoint belongs to local Wrangler, not the application's public routes.
 - Replace the complete snapshot in one KV write with a 24-hour expiration. On failure, retain the previous value without extending its lifetime.
 - Withhold prior-day snapshots. Same-day snapshots become stale after 90 minutes and remain visible with a warning.
-- `GET /` serves HTML; `GET /api/today.json` serves the snapshot with `ready`, `stale`, `pending`, or `unavailable` status. Both support HEAD. The API returns HTTP 503 and a null verdict when no current result exists.
+- `GET /` serves the HTML dashboard.
+- `GET /api/today.json` serves the snapshot with `ready`, `stale`, `pending`, or `unavailable` status. It returns HTTP 503 and a null verdict when no current result exists.
+- `GET /api/today.rss` serves an RSS 2.0 feed of qualifying CVEs. Missing current data returns HTTP 503 with an empty feed. All three routes support HEAD.
 - Cache ready responses for at most five minutes, never past UTC midnight or the staleness threshold. Query strings do not create distinct cache keys. Pending, stale, and unavailable responses use `no-store`.
 - Preserve bounded pagination, request timeouts, and rate-limit spacing. The project targets Workers Free. Local tests and builds do not establish production CPU compliance.
 

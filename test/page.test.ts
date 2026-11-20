@@ -69,7 +69,9 @@ describe("renderPage", () => {
     expect(html).toContain('href="https://www.cve.org/"');
     expect(html).toContain('href="https://vulnerability.circl.lu/"');
     expect(html).toContain('href="https://nvd.nist.gov/"');
-    expect(html).toContain("Today's JSON</a>.</p>");
+    expect(html).toContain(`<a href="/api/today.json">Today's JSON</a>`);
+    expect(html).toContain(`<a href="/api/today.rss">Today's RSS</a>`);
+    expect(html).toContain(`rel="alternate" type="application/rss+xml" title="Today's CVEs" href="/api/today.rss"`);
     expect(html).toContain("<p>This is an independent project and is not endorsed, certified, or supported by any of these sources.</p>");
     expect(html).not.toContain("This product uses the NVD API but is not endorsed or certified by the NVD.");
     expect(html).not.toContain("published today in NVD");

@@ -20,6 +20,7 @@ export function renderPage(view: SnapshotView): string {
   <meta name="color-scheme" content="light dark">
   <meta property="og:title" content="Is There a CVE Today? ${verdict}">
   <meta property="og:description" content="${escapeHtml(description)}">
+  <link rel="alternate" type="application/rss+xml" title="Today's CVEs" href="/api/today.rss">
   <title>${verdict} | Is There a CVE Today?</title>
   <style>${styles}</style>
 </head>
@@ -56,7 +57,7 @@ export function renderPage(view: SnapshotView): string {
         <h2 id="method-heading">What counts?</h2>
         <p>YES means at least one CVE first published today in the CVE Program has a CVSS v3 or v4 base score of 7.0 or higher. We use the highest available score, whether supplied by NVD or a contributing organization. Rejected records are excluded.</p>
         <p>We check official CVE Program records mirrored by CIRCL Vulnerability Lookup every 30 minutes and enrich them with NVD data by CVE ID. The publication day comes from the CVE record's original publication date, not its NVD publication date. New records and scores can arrive late. Unscored CVEs don't affect the answer. Categories use product names, a few specialist publishers, and keyword rules. They can be wrong.</p>
-        <p>Sources: <a href="https://www.cve.org/" rel="noopener noreferrer">CVE Program</a>, <a href="https://vulnerability.circl.lu/" rel="noopener noreferrer">CIRCL Vulnerability Lookup</a>, and <a href="https://nvd.nist.gov/" rel="noopener noreferrer">National Vulnerability Database</a>. <a href="/api/today.json">Today's JSON</a>.</p>
+        <p>Sources: <a href="https://www.cve.org/" rel="noopener noreferrer">CVE Program</a>, <a href="https://vulnerability.circl.lu/" rel="noopener noreferrer">CIRCL Vulnerability Lookup</a>, and <a href="https://nvd.nist.gov/" rel="noopener noreferrer">National Vulnerability Database</a>. <a href="/api/today.json">Today's JSON</a> · <a href="/api/today.rss">Today's RSS</a>.</p>
         <p>This is an independent project and is not endorsed, certified, or supported by any of these sources.</p>
       </section>
     </main>
