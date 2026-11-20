@@ -86,7 +86,7 @@ export async function handleRequest(
 
   const body = isApi
     ? JSON.stringify({ ...view.snapshot, date: view.date, status: view.status, verdict: view.snapshot?.verdict ?? null })
-    : isRss ? renderRss(view) : renderPage(view);
+    : isRss ? renderRss(view, url) : renderPage(view);
   const response = new Response(body, { status, headers });
   if (view.status === "ready" && headers.get("Cache-Control") !== "no-store") {
     ctx.waitUntil(caches.default.put(cacheKey, response.clone()).catch((error: unknown) => {

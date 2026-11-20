@@ -65,6 +65,27 @@ describe("HTTP handler", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("uses the request origin for RSS links and drops query parameters", async () => {
+    const request = new Request("http://localhost:8787/api/today.rss?reader=test");
+    const response = await handleRequest(request, env, ctx, now);
+    const xml = await response.text();
+    expect(xml).toContain("<link>http://localhost:8787/</link>");
+    expect(xml).toContain('<atom:link href="http://localhost:8787/api/today.rss" rel="self"');
+  });
+
+  it.each([{}, { software: [] }])("labels unknown software in stored RSS entries (%j)", async (fields) => {
+    kv.get.mockResolvedValue({
+      ...snapshot,
+      categories: snapshot.categories.map(category => ({
+        ...category,
+        cves: category.cves.map(({ software: _software, ...cve }) => ({ ...cve, ...fields })),
+      })),
+    });
+    const response = await handleRequest(new Request("https://example.com/api/today.rss"), env, ctx, now);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("<title>CVE-2026-1000 [HIGH 8.1] Unknown</title>");
+  });
+
   it("serves bodyless RSS HEAD", async () => {
     const response = await handleRequest(new Request("https://example.com/api/today.rss", { method: "HEAD" }), env, ctx, now);
     expect(response.status).toBe(200);

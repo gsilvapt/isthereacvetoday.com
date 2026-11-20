@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderRss } from "../src/rss";
 import type { Snapshot, ListedCve } from "../src/types";
 
+const feedUrl = new URL("https://preview.example/api/today.rss");
 const entry: ListedCve = {
   id: "CVE-2026-1000", publishedAt: "2026-11-19T08:00:00Z", sources: ["cve"],
   severity: "HIGH", score: 8.1, version: "3.1", source: "test",
@@ -15,7 +16,7 @@ const snapshot: Snapshot = {
 
 describe("RSS rendering", () => {
   it("escapes XML and HTML descriptions, preserves stable IDs and formats dates", () => {
-    const xml = renderRss({ date: snapshot.date, status: "ready", snapshot });
+    const xml = renderRss({ date: snapshot.date, status: "ready", snapshot }, feedUrl);
     expect(xml).toContain('<rss version="2.0"');
     expect(xml).toContain("A &amp; B &lt;tool&gt;");
     expect(xml).toContain("&amp;lt;script&amp;gt;");
@@ -28,7 +29,7 @@ describe("RSS rendering", () => {
   });
 
   it("renders a successful empty feed without fictitious items", () => {
-    const xml = renderRss({ date: snapshot.date, status: "ready", snapshot: { ...snapshot, categories: [], verdict: "NO" } });
+    const xml = renderRss({ date: snapshot.date, status: "ready", snapshot: { ...snapshot, categories: [], verdict: "NO" } }, feedUrl);
     expect(xml).not.toContain("<item>");
     expect(xml).toContain("</rss>");
   });
