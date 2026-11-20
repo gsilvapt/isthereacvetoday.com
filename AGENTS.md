@@ -4,9 +4,10 @@ This is a TypeScript Cloudflare Worker that reports whether any High or Critical
 
 ## Code map
 
-- `src/index.ts`: HTTP routes, security headers, edge caching, and scheduled refresh. `refreshSnapshot` fetches both feeds, merges records, builds a snapshot, and writes KV only after success.
-- `src/cve.ts`: CVE Program records from CIRCL's `cvelistv5` mirror, validation, latest-revision deduplication, and NVD enrichment by uppercase CVE ID.
+- `src/index.ts`: HTTP routes, security headers, edge caching, and scheduled refresh. `refreshSnapshot` fetches CVE, NVD, and OSV data concurrently, merges records, builds a snapshot, writes it to KV only after success, then writes the OSV state.
+- `src/cve.ts`: CVE Program records from CIRCL's `cvelistv5` mirror, validation, latest-revision deduplication, NVD enrichment by uppercase CVE ID, and OSV package consolidation by CVE alias.
 - `src/nvd.ts`: paginated NVD client with request timeouts and rate-limit spacing.
+- `src/osv.ts`: OSV client. Streams the newest-first `modified_id.csv` change list through a 2 MiB Range request and stops reading at the scan bound, one hour before the later of the cursor and today's UTC midnight. It keeps package-registry ecosystems only, skips `MAL-` reports, and fetches at most 9 records per run, 4 at a time. Failed records stop the cursor before them. Its KV state (key `osv`) resets each UTC day and records a sticky gap when the range ends before the scan bound.
 - `src/snapshot.ts`: CVSS selection, UTC-day filtering, totals, affected software labels, and freshness. The KV key is `today`.
 - `src/classify.ts`: category definitions and ordered classification rules.
 - `src/page.ts` and `src/styles.css`: escaped server-rendered HTML and inline CSS. Expandable lists use native `<details>` elements.
@@ -22,16 +23,18 @@ This is a TypeScript Cloudflare Worker that reports whether any High or Critical
 
 - Determine publication day only from CVE Program `cveMetadata.datePublished`. Normalize timestamps to UTC, exclude future records, and never substitute reservation, disclosure, revision, mirror-ingestion, or NVD dates.
 - Count canonical uppercase CVE IDs once across sources and packages. Separate IDs stay separate. NVD-only records cannot establish CVE publication or enter the totals.
+- OSV adds package names only, matched by CVE alias. It never creates CVEs or changes the totals or the verdict, though its packages can move a CVE into the Open-Source Libraries category. Read only package-registry ecosystems, whose sources have reviewed licenses, and keep their attribution in the README and page.
 - Use the latest authoritative CVE revision and exclude rejections. Missing required dates, conflicting states at the same revision, invalid responses, or incomplete pagination must fail the refresh rather than publish a guessed or partial result.
 - Select the highest valid CVSS 4.0, 3.1, or 3.0 base score across source metrics. Prefer the newer version on a tie and preserve score provenance. High is `>= 7` and `< 9`; Critical is `>= 9`. Missing or v2-only scores are unscored, not zero.
 - YES requires at least one High or Critical record. A successfully fetched day with no qualifying records is NO. Missing data must never produce NO.
-- Assign each listed CVE one category. Classification precedence is specialist publisher, affected product/vulnerable CPE, description, coarse CPE type, then Other. Generic vulnerability terms must not imply a product category.
+- Assign each listed CVE one category. Classification precedence is specialist publisher, affected product/vulnerable CPE, description, OSV package-registry package, coarse CPE type, then Other. Generic vulnerability terms must not imply a product category.
 - Preserve distinct affected package names, merge duplicate software labels, and fall back to vulnerable CPEs when names are absent. Show an explicit unknown-software label if no name is available. Keep one CVE Program record link per card and escape all upstream text.
 
 ## Storage and request behavior
 
 - Only scheduled refreshes fetch upstream data. Visitor requests must not trigger refreshes or control upstream queries. The `/__scheduled` test endpoint belongs to local Wrangler, not the application's public routes.
 - Replace the complete snapshot in one KV write with a 24-hour expiration. On failure, retain the previous value without extending its lifetime.
+- Write the OSV state to the second KV key, `osv`, with a 24-hour expiration and only after the snapshot write succeeds. OSV failures, caps, and gaps never block publication. They set `osv.complete` to false in the snapshot, and the page shows a note.
 - Withhold prior-day snapshots. Same-day snapshots become stale after 90 minutes and remain visible with a warning.
 - `GET /` serves the HTML dashboard.
 - `GET /api/today.json` serves the snapshot with `ready`, `stale`, `pending`, or `unavailable` status. It returns HTTP 503 and a null verdict when no current result exists.

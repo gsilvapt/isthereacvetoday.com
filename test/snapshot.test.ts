@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildSnapshot, getSnapshotView, highestScore, STALE_AFTER_MS } from "../src/snapshot";
 import fixture from "./fixtures/nvd-sample.json";
-import { cve } from "./helpers";
+import { completeOsv, cve } from "./helpers";
 
 const now = new Date("2026-11-19T09:00:00.000Z");
 
@@ -10,7 +10,7 @@ describe("buildSnapshot", () => {
     const snapshot = buildSnapshot([6.9, 7, 8.9, 9, 10].map((baseScore, index) => cve({
       id: `CVE-2026-${1000 + index}`,
       metrics: { cvssMetricV31: [{ cvssData: { version: "3.1", baseScore } }] },
-    })), now);
+    })), now, completeOsv);
     expect(snapshot.verdict).toBe("YES");
     expect(snapshot.totals).toEqual({ published: 5, critical: 2, high: 2, unscored: 0 });
     const other = snapshot.categories.find((category) => category.id === "other")!;
@@ -22,7 +22,7 @@ describe("buildSnapshot", () => {
     const snapshot = buildSnapshot([
       cve({ metrics: undefined }),
       cve({ id: "CVE-2026-1001", metrics: { cvssMetricV2: [{ cvssData: { version: "2.0", baseScore: 10 } }] } }),
-    ], now);
+    ], now, completeOsv);
     expect(snapshot.verdict).toBe("NO");
     expect(snapshot.totals.unscored).toBe(2);
   });
@@ -39,23 +39,24 @@ describe("buildSnapshot", () => {
     ["excludes a future instant expressed with an offset", "2026-11-19T08:30:00.000-01:00", 0],
     ["excludes invalid publication timestamps", "not-a-timestamp", 0],
   ])("%s", (_name, publishedAt, published) => {
-    const snapshot = buildSnapshot([cve({ publishedAt })], now);
+    const snapshot = buildSnapshot([cve({ publishedAt })], now, completeOsv);
     expect(snapshot.totals).toEqual({ published, critical: 0, high: published, unscored: 0 });
     expect(snapshot.categories.flatMap((category) => category.cves)).toHaveLength(published);
     expect(snapshot.verdict).toBe(published ? "YES" : "NO");
     expect(snapshot.date).toBe("2026-11-19");
     expect(snapshot.updatedAt).toBe(now.toISOString());
+    expect(snapshot.osv).toBe(completeOsv);
   });
 
   it.each(["Rejected", "REJECTED", "rejected"])("skips %s records", (vulnStatus) => {
-    const snapshot = buildSnapshot([cve({ vulnStatus })], now);
+    const snapshot = buildSnapshot([cve({ vulnStatus })], now, completeOsv);
     expect(snapshot.totals).toEqual({ published: 0, critical: 0, high: 0, unscored: 0 });
     expect(snapshot.verdict).toBe("NO");
     expect(snapshot.categories.every((category) => category.cves.length === 0)).toBe(true);
   });
 
   it("counts and lists each CVE ID once", () => {
-    const snapshot = buildSnapshot([cve(), cve({ sources: ["cve", "nvd"] })], now);
+    const snapshot = buildSnapshot([cve(), cve({ sources: ["cve", "nvd"] })], now, completeOsv);
     expect(snapshot.totals).toEqual({ published: 1, critical: 0, high: 1, unscored: 0 });
     expect(snapshot.categories.flatMap((category) => category.cves).map((entry) => entry.id))
       .toEqual(["CVE-2026-1000"]);
@@ -65,7 +66,7 @@ describe("buildSnapshot", () => {
     const snapshot = buildSnapshot([
       cve({ publishedAt: "2026-11-18T08:00:00.000Z" }),
       cve(),
-    ], now);
+    ], now, completeOsv);
     expect(snapshot.totals).toEqual({ published: 1, critical: 0, high: 1, unscored: 0 });
   });
 
@@ -76,7 +77,7 @@ describe("buildSnapshot", () => {
       affected: [{ affectedData: [{ product: "Example Server", packageName: "example-server" }] }],
       descriptions: [{ lang: "en", value: "An issue in Example Server." }],
     });
-    const snapshot = buildSnapshot([record], now);
+    const snapshot = buildSnapshot([record], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)).toEqual([{
       id: record.id,
       publishedAt: record.publishedAt,
@@ -91,7 +92,7 @@ describe("buildSnapshot", () => {
   });
 
   it("returns NO for a successfully fetched empty day", () => {
-    const snapshot = buildSnapshot([], now);
+    const snapshot = buildSnapshot([], now, completeOsv);
     expect(snapshot.verdict).toBe("NO");
     expect(snapshot.categories).toHaveLength(10);
     expect(snapshot.categories.every((category) => category.maxScore === null)).toBe(true);
@@ -101,7 +102,7 @@ describe("buildSnapshot", () => {
     const snapshot = buildSnapshot([
       cve({ descriptions: [{ lang: "en", value: `Text\n\t${"x".repeat(800)}` }] }),
       cve({ id: "CVE-2026-1001", descriptions: [{ lang: "pt", value: "Texto" }] }),
-    ], now);
+    ], now, completeOsv);
     const entries = snapshot.categories.flatMap((category) => category.cves);
     expect(entries[0]?.summary).toHaveLength(600);
     expect(entries[0]?.summary).not.toMatch(/\s{2}/);
@@ -115,7 +116,7 @@ describe("buildSnapshot", () => {
       publishedAt: "2026-11-19T08:00:00.000Z",
       sources: ["cve", "nvd"],
     }));
-    const snapshot = buildSnapshot(records, now);
+    const snapshot = buildSnapshot(records, now, completeOsv);
     expect(snapshot.totals).toEqual({ published: 5, high: 3, critical: 0, unscored: 0 });
     expect(snapshot.categories.find((category) => category.id === "libraries")?.cves[0]).toMatchObject({
       id: "CVE-2026-126962",
@@ -131,7 +132,7 @@ describe("affected software", () => {
   it("combines a product and its distinct package name", () => {
     const snapshot = buildSnapshot([cve({ affected: [{ affectedData: [
       { product: "  Example\n Server  ", packageName: " example-server " },
-    ] }] })], now);
+    ] }] })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software)
       .toEqual(["Example Server (example-server)"]);
   });
@@ -139,7 +140,7 @@ describe("affected software", () => {
   it("does not repeat a package name matching its product case-insensitively", () => {
     const snapshot = buildSnapshot([cve({ affected: [{ affectedData: [
       { product: "ExampleServer", packageName: "exampleserver" },
-    ] }] })], now);
+    ] }] })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software).toEqual(["ExampleServer"]);
   });
 
@@ -147,7 +148,7 @@ describe("affected software", () => {
     const snapshot = buildSnapshot([cve({ affected: [
       { affectedData: [{ product: "Example Server" }, { product: "Example Client" }] },
       { affectedData: [{ product: "Example Agent" }] },
-    ] })], now);
+    ] })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software)
       .toEqual(["Example Server", "Example Client", "Example Agent"]);
   });
@@ -158,7 +159,7 @@ describe("affected software", () => {
       { product: "EXAMPLE SERVER", packageName: "EXAMPLE-SERVER" },
       { product: "Example Client" },
       { product: "example client" },
-    ] }] })], now);
+    ] }] })], now, completeOsv);
     const software = snapshot.categories.flatMap((category) => category.cves)[0]!.software;
     expect(software.map((name) => name.toLowerCase())).toEqual(["example server (example-server)", "example client"]);
   });
@@ -171,7 +172,7 @@ describe("affected software", () => {
     const snapshot = buildSnapshot([cve({
       sources: ["cve", "nvd"],
       affected: order === "CNA first" ? affected : affected.toReversed(),
-    })], now);
+    })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software)
       .toEqual(["Example Server (example-server)"]);
   });
@@ -184,7 +185,7 @@ describe("affected software", () => {
     const snapshot = buildSnapshot([cve({
       sources: ["cve", "nvd"],
       affected: order === "package-only first" ? affected : affected.toReversed(),
-    })], now);
+    })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software)
       .toEqual(["Example Server (@example/server)"]);
   });
@@ -196,7 +197,7 @@ describe("affected software", () => {
         { affectedData: [{ product: "Example Server", packageName: "@example/server" }] },
         { affectedData: [{ product: "Example Server", packageName: "@legacy/server" }] },
       ],
-    })], now);
+    })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software)
       .toEqual(["Example Server (@example/server)", "Example Server (@legacy/server)"]);
   });
@@ -204,7 +205,7 @@ describe("affected software", () => {
   it.each(["n/a", "NA", "Unknown", "unspecified", "not specified", "not available", "*", "-", "", " \t "])(
     "omits the unavailable product placeholder %j",
     (product) => {
-      const snapshot = buildSnapshot([cve({ affected: [{ affectedData: [{ product }] }] })], now);
+      const snapshot = buildSnapshot([cve({ affected: [{ affectedData: [{ product }] }] })], now, completeOsv);
       expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software).toEqual([]);
     },
   );
@@ -212,7 +213,7 @@ describe("affected software", () => {
   it.each([undefined, "n/a", "unknown"])("falls back to packageName when product is %j", (product) => {
     const snapshot = buildSnapshot([cve({ affected: [{ affectedData: [
       { product, packageName: "@example/server" },
-    ] }] })], now);
+    ] }] })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software).toEqual(["@example/server"]);
   });
 
@@ -226,7 +227,7 @@ describe("affected software", () => {
         { vulnerable: true, criteria: "cpe:/a:example:example_client:1" },
         { vulnerable: false, criteria: "cpe:2.3:o:microsoft:windows:*:*:*:*:*:*:*:*" },
       ] }] }],
-    })], now);
+    })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software)
       .toEqual(["example server", "example client"]);
   });
@@ -237,7 +238,7 @@ describe("affected software", () => {
       configurations: undefined,
       descriptions: undefined,
       sourceIdentifier: undefined,
-    })], now);
+    })], now, completeOsv);
     expect(snapshot.categories.flatMap((category) => category.cves)[0]?.software).toEqual([]);
   });
 });
@@ -271,7 +272,7 @@ describe("highestScore", () => {
 
 describe("getSnapshotView", () => {
   it("withholds yesterday's verdict at UTC midnight", () => {
-    const yesterday = buildSnapshot([cve()], now);
+    const yesterday = buildSnapshot([cve()], now, completeOsv);
     expect(getSnapshotView(yesterday, new Date("2026-11-20T00:00:00Z"))).toEqual({
       date: "2026-11-20", status: "pending", snapshot: null,
     });
@@ -279,7 +280,7 @@ describe("getSnapshotView", () => {
   });
 
   it("marks the last good result stale after 90 minutes", () => {
-    const snapshot = buildSnapshot([cve()], now);
+    const snapshot = buildSnapshot([cve()], now, completeOsv);
     expect(getSnapshotView(snapshot, new Date(now.getTime() + STALE_AFTER_MS - 1)).status).toBe("ready");
     expect(getSnapshotView(snapshot, new Date(now.getTime() + STALE_AFTER_MS))).toMatchObject({ status: "stale", snapshot });
   });

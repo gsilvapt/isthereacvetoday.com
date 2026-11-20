@@ -1,0 +1,24 @@
+{
+  "changeList": [
+    "2026-11-20T09:00:02.79484792Z,GIT/EEF-CVE-2026-49757",
+    "2026-11-20T09:00:02.79484792Z,Hex/EEF-CVE-2026-49757"
+  ],
+  "hex": {
+    "id": "EEF-CVE-2026-49757",
+    "modified": "2026-11-20T09:00:02.794847920Z",
+    "aliases": ["CVE-2026-49757", "GHSA-777c-2fxx-qr28"],
+    "affected": [
+      { "package": { "name": "ash_authentication", "ecosystem": "Hex" } },
+      {}
+    ]
+  },
+  "githubActions": {
+    "id": "GHSA-6f4g-xm8v-pgv6",
+    "modified": "2026-11-11T02:57:10.295103665Z",
+    "aliases": ["CVE-2026-123369"],
+    "affected": [
+      { "package": { "name": "tmatens/compose-lint", "ecosystem": "GitHub Actions" } },
+      { "package": { "name": "compose-lint", "ecosystem": "PyPI" } }
+    ]
+  }
+}

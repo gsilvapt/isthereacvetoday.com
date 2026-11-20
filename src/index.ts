@@ -1,5 +1,6 @@
 import { fetchTodaysCves } from "./nvd";
 import { fetchCveRecords, mergeCveRecords } from "./cve";
+import { OSV_STATE_KEY, refreshOsv } from "./osv";
 import { renderPage } from "./page";
 import { renderRss } from "./rss";
 import { buildSnapshot, getSnapshotView, SNAPSHOT_KEY, STALE_AFTER_MS } from "./snapshot";
@@ -97,16 +98,26 @@ export async function handleRequest(
 }
 
 export async function refreshSnapshot(env: Env, now = new Date()): Promise<void> {
+  let saved = false;
   try {
-    const [records, nvdCves] = await Promise.all([
+    const [records, nvdCves, osv] = await Promise.all([
       fetchCveRecords(now),
       fetchTodaysCves(now, env.NVD_API_KEY),
+      refreshOsv(env.CVE_STATUS, now),
     ]);
-    const snapshot = buildSnapshot(mergeCveRecords(records, nvdCves), now);
+    const cves = mergeCveRecords(records, nvdCves, osv.state.records);
+    const snapshot = buildSnapshot(cves, now, { complete: osv.complete, through: osv.state.cursor });
     await env.CVE_STATUS.put(SNAPSHOT_KEY, JSON.stringify(snapshot), { expirationTtl: SNAPSHOT_TTL_SECONDS });
-    console.log("Snapshot refreshed", { date: snapshot.date, ...snapshot.totals });
+    saved = true;
+    console.log("Snapshot refreshed", { date: snapshot.date, ...snapshot.totals, osv: snapshot.osv });
+    // Saving OSV progress only after the snapshot keeps it from recording packages the snapshot lacks.
+    if (osv.updated) {
+      await env.CVE_STATUS.put(OSV_STATE_KEY, JSON.stringify(osv.state), { expirationTtl: SNAPSHOT_TTL_SECONDS });
+    }
   } catch (error) {
-    console.error("Snapshot refresh failed; keeping the last successful result", error);
+    console.error(saved
+      ? "OSV progress save failed; the snapshot was saved and the next refresh repeats this OSV work"
+      : "Snapshot refresh failed; keeping the last successful result", error);
     throw error;
   }
 }

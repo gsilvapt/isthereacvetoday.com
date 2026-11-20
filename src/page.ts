@@ -16,7 +16,7 @@ export function renderPage(view: SnapshotView): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A daily check for High and Critical CVEs, grouped by technology. Updated every 30 minutes with CVE Program records and NVD enrichment.">
+  <meta name="description" content="A daily check for High and Critical CVEs, grouped by technology. Updated every 30 minutes with CVE Program records, NVD enrichment, and OSV package names.">
   <meta name="color-scheme" content="light dark">
   <meta property="og:title" content="Is There a CVE Today? ${verdict}">
   <meta property="og:description" content="${escapeHtml(description)}">
@@ -56,8 +56,9 @@ export function renderPage(view: SnapshotView): string {
       <section class="method" aria-labelledby="method-heading">
         <h2 id="method-heading">What counts?</h2>
         <p>YES means at least one CVE first published today in the CVE Program has a CVSS v3 or v4 base score of 7.0 or higher. We use the highest available score, whether supplied by NVD or a contributing organization. Rejected records are excluded.</p>
-        <p>We check official CVE Program records mirrored by CIRCL Vulnerability Lookup every 30 minutes and enrich them with NVD data by CVE ID. The publication day comes from the CVE record's original publication date, not its NVD publication date. New records and scores can arrive late. Unscored CVEs don't affect the answer. Categories use product names, a few specialist publishers, and keyword rules. They can be wrong.</p>
-        <p>Sources: <a href="https://www.cve.org/" rel="noopener noreferrer">CVE Program</a>, <a href="https://vulnerability.circl.lu/" rel="noopener noreferrer">CIRCL Vulnerability Lookup</a>, and <a href="https://nvd.nist.gov/" rel="noopener noreferrer">National Vulnerability Database</a>. <a href="/api/today.json">Today's JSON</a> · <a href="/api/today.rss">Today's RSS</a>.</p>
+        <p>We check official CVE Program records mirrored by CIRCL Vulnerability Lookup every 30 minutes and enrich them with NVD data by CVE ID. The publication day comes from the CVE record's original publication date, not its NVD publication date. New records and scores can arrive late. Unscored CVEs don't affect the answer. Package names can also come from OSV advisories that list the CVE as an alias. They never change the totals or the answer, and can lag behind. Categories use product names, package registries, a few specialist publishers, and keyword rules. They can be wrong.</p>
+        <p>Sources: <a href="https://www.cve.org/" rel="noopener noreferrer">CVE Program</a>, <a href="https://vulnerability.circl.lu/" rel="noopener noreferrer">CIRCL Vulnerability Lookup</a>, <a href="https://nvd.nist.gov/" rel="noopener noreferrer">National Vulnerability Database</a>, and <a href="https://osv.dev/" rel="noopener noreferrer">OSV</a>. <a href="/api/today.json">Today's JSON</a> · <a href="/api/today.rss">Today's RSS</a>.</p>
+        <p>OSV collects package data from package-registry advisory databases, including GitHub, PyPI, Go, and RustSec. We use only CVE aliases and package names, under each source's license (CC BY 4.0, CC0 1.0, Apache 2.0, or MIT). See <a href="https://google.github.io/osv.dev/data/" rel="noopener noreferrer">OSV data sources and licenses</a>.</p>
         <p>This is an independent project and is not endorsed, certified, or supported by any of these sources.</p>
       </section>
     </main>
@@ -76,10 +77,11 @@ function renderFreshness(view: SnapshotView): string {
   if (!view.snapshot) return "";
   const updatedAt = view.snapshot.updatedAt;
   const timestamp = `<time datetime="${escapeHtml(updatedAt)}">${escapeHtml(updatedAt.slice(11, 16))} UTC</time>`;
+  const osvNote = view.snapshot.osv?.complete !== false ? "" : `\n        <p class="freshness">OSV package names may be incomplete.</p>`;
   if (view.status === "stale") {
-    return `<p class="freshness stale" role="status">Stale data. Last successful check: ${timestamp}. Showing the last known result.</p>`;
+    return `<p class="freshness stale" role="status">Stale data. Last successful check: ${timestamp}. Showing the last known result.</p>${osvNote}`;
   }
-  return `<p class="freshness"><span class="dot" aria-hidden="true"></span> Last checked ${timestamp} / refreshes every 30 min</p>`;
+  return `<p class="freshness"><span class="dot" aria-hidden="true"></span> Last checked ${timestamp} / refreshes every 30 min</p>${osvNote}`;
 }
 
 function renderCategory(category: CategorySnapshot): string {
