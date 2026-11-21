@@ -1,6 +1,7 @@
 import { fetchTodaysCves } from "./nvd";
 import { fetchCveRecords, mergeCveRecords } from "./cve";
 import { renderPage } from "./page";
+import { renderRss } from "./rss";
 import { buildSnapshot, getSnapshotView, SNAPSHOT_KEY, STALE_AFTER_MS } from "./snapshot";
 import type { Env, Snapshot, SnapshotView } from "./types";
 
@@ -37,7 +38,7 @@ export async function handleRequest(
       headers: { ...SECURITY_HEADERS, "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
     });
   }
-  if (url.pathname !== "/" && url.pathname !== "/api/today.json") {
+  if (url.pathname !== "/" && url.pathname !== "/api/today.json" && url.pathname !== "/api/today.rss") {
     return new Response(request.method === "HEAD" ? null : "Not found", {
       status: 404,
       headers: { ...SECURITY_HEADERS, "Content-Type": "text/plain; charset=utf-8" },
@@ -69,9 +70,10 @@ export async function handleRequest(
   }
 
   const isApi = url.pathname === "/api/today.json";
-  const status = view.status === "unavailable" || (isApi && !view.snapshot) ? 503 : 200;
+  const isRss = url.pathname === "/api/today.rss";
+  const status = view.status === "unavailable" || ((isApi || isRss) && !view.snapshot) ? 503 : 200;
   const headers = new Headers(SECURITY_HEADERS);
-  headers.set("Content-Type", isApi ? "application/json; charset=utf-8" : "text/html; charset=utf-8");
+  headers.set("Content-Type", isApi ? "application/json; charset=utf-8" : isRss ? "application/rss+xml; charset=utf-8" : "text/html; charset=utf-8");
   headers.set("Cache-Control", "no-store");
   if (status === 503) headers.set("Retry-After", "300");
 
@@ -84,7 +86,7 @@ export async function handleRequest(
 
   const body = isApi
     ? JSON.stringify({ ...view.snapshot, date: view.date, status: view.status, verdict: view.snapshot?.verdict ?? null })
-    : renderPage(view);
+    : isRss ? renderRss(view, url) : renderPage(view);
   const response = new Response(body, { status, headers });
   if (view.status === "ready" && headers.get("Cache-Control") !== "no-store") {
     ctx.waitUntil(caches.default.put(cacheKey, response.clone()).catch((error: unknown) => {
