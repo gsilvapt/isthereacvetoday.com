@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderPage } from "../src/page";
-import { buildSnapshot, getSnapshotView } from "../src/snapshot";
-import { cve } from "./helpers";
+import { buildSnapshot, getSnapshotView, STALE_AFTER_MS } from "../src/snapshot";
+import { completeOsv, cve } from "./helpers";
 
 const now = new Date("2026-11-19T09:00:00.000Z");
 
@@ -9,7 +9,7 @@ describe("renderPage", () => {
   it("escapes upstream descriptions before rendering HTML", () => {
     const snapshot = buildSnapshot([cve({
       descriptions: [{ lang: "en", value: '<script>alert("xss")</script> & <img src=x onerror=alert(1)>' }],
-    })], now);
+    })], now, completeOsv);
     const html = renderPage(getSnapshotView(snapshot, now));
     expect(html).toContain("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt; &amp; &lt;img");
     expect(html).not.toContain("<script");
@@ -20,7 +20,7 @@ describe("renderPage", () => {
     const snapshot = buildSnapshot([cve({
       id: "CVE-2026-129048",
       affected: [{ affectedData: [{ product: "WP Photo Album Plus", packageName: "wp-photo-album-plus" }] }],
-    })], now);
+    })], now, completeOsv);
     const html = renderPage(getSnapshotView(snapshot, now));
     expect(html).toContain('CVE-2026-129048 <span class="cve-software">WP Photo Album Plus (wp-photo-album-plus)</span>');
   });
@@ -28,20 +28,20 @@ describe("renderPage", () => {
   it("escapes affected software names before rendering HTML", () => {
     const snapshot = buildSnapshot([cve({
       affected: [{ affectedData: [{ product: '<img src=x onerror=alert("xss")> & \'software\'' }] }],
-    })], now);
+    })], now, completeOsv);
     const html = renderPage(getSnapshotView(snapshot, now));
     expect(html).toContain('<span class="cve-software">&lt;img src=x onerror=alert(&quot;xss&quot;)&gt; &amp; &#39;software&#39;</span>');
     expect(html).not.toContain("<img");
   });
 
   it("labels CVEs without affected software", () => {
-    const snapshot = buildSnapshot([cve({ affected: [], configurations: [] })], now);
+    const snapshot = buildSnapshot([cve({ affected: [], configurations: [] })], now, completeOsv);
     const html = renderPage(getSnapshotView(snapshot, now));
     expect(html).toContain('<span class="cve-software">Software not specified</span>');
   });
 
   it("includes all categories, native expandable lists, and one advisory link per CVE", () => {
-    const snapshot = buildSnapshot([cve(), cve({ id: "CVE-2026-1001" })], now);
+    const snapshot = buildSnapshot([cve(), cve({ id: "CVE-2026-1001" })], now, completeOsv);
     const html = renderPage(getSnapshotView(snapshot, now));
     expect(html.match(/<details class="category /g)).toHaveLength(10);
     expect(html).toContain('<h2 class="verdict yes" aria-label="Today\'s answer: YES">');
@@ -59,7 +59,7 @@ describe("renderPage", () => {
   });
 
   it("explains original CVE Program publication and attributes all data sources", () => {
-    const snapshot = buildSnapshot([cve()], now);
+    const snapshot = buildSnapshot([cve()], now, completeOsv);
     const html = renderPage(getSnapshotView(snapshot, now));
     expect(html).toContain("first published in the CVE Program today");
     expect(html).toContain("CVEs first published today in the CVE Program");
@@ -69,6 +69,10 @@ describe("renderPage", () => {
     expect(html).toContain('href="https://www.cve.org/"');
     expect(html).toContain('href="https://vulnerability.circl.lu/"');
     expect(html).toContain('href="https://nvd.nist.gov/"');
+    expect(html).toContain('href="https://osv.dev/"');
+    expect(html).toContain('href="https://google.github.io/osv.dev/data/"');
+    expect(html).toContain("under each source's license (CC BY 4.0, CC0 1.0, Apache 2.0, or MIT)");
+    expect(html).toContain("They never change the totals or the answer");
     expect(html).toContain(`<a href="/api/today.json">Today's JSON</a>`);
     expect(html).toContain(`<a href="/api/today.rss">Today's RSS</a>`);
     expect(html).toContain(`rel="alternate" type="application/rss+xml" title="Today's CVEs" href="/api/today.rss"`);
@@ -80,7 +84,7 @@ describe("renderPage", () => {
   });
 
   it("makes the NO verdict specific to the available scored data", () => {
-    const snapshot = buildSnapshot([cve({ metrics: {} })], now);
+    const snapshot = buildSnapshot([cve({ metrics: {} })], now, completeOsv);
     const html = renderPage(getSnapshotView(snapshot, now));
     expect(html).toContain("Today's answer: NO");
     expect(html).toContain("No High or Critical CVEs found in today&#39;s CVE Program publications yet");
@@ -96,5 +100,21 @@ describe("renderPage", () => {
     expect(footer).toContain('<a href="https://github.com/gsilvapt/isthereacvetoday.com" rel="noopener noreferrer">Contribute on GitHub</a>');
     expect(footer).toContain('<a href="https://ko-fi.com/gsilvapt" rel="noopener noreferrer">Donate on Ko-fi</a>');
     expect(html).not.toContain('class="category quiet"');
+  });
+
+  it.each([0, STALE_AFTER_MS])("notes incomplete OSV package data %i ms after the refresh", (age) => {
+    const note = '<p class="freshness">OSV package names may be incomplete.</p>';
+    const later = new Date(now.getTime() + age);
+    expect(renderPage(getSnapshotView(buildSnapshot([cve()], now, completeOsv), later))).not.toContain("OSV package names may be incomplete");
+    const html = renderPage(getSnapshotView(buildSnapshot([cve()], now, { complete: false, through: null }), later));
+    expect(html.match(/OSV package names may be incomplete/g)).toHaveLength(1);
+    expect(html).toContain(note);
+  });
+
+  it("renders a snapshot stored before OSV enrichment without an OSV note", () => {
+    const { osv: _osv, ...stored } = buildSnapshot([cve()], now, completeOsv);
+    const html = renderPage(getSnapshotView(stored, now));
+    expect(html).toContain("Today's answer: YES");
+    expect(html).not.toContain("OSV package names may be incomplete");
   });
 });

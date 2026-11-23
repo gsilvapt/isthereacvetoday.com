@@ -77,4 +77,16 @@ describe("classify", () => {
     expect(classify(cve({ sourceIdentifier: "constructor" }))).toBe("other");
     expect(new Set(CATEGORIES.map((category) => category.id)).size).toBe(10);
   });
+
+  it.each([
+    [{}, "libraries"],
+    [{ configurations: [{ nodes: [{ cpeMatch: [{ vulnerable: true, criteria: "cpe:2.3:o:unknown:unknown:*:*:*:*:*:*:*:*" }] }] }] }, "libraries"],
+    [{ affected: [{ affectedData: [{ product: "WordPress" }] }] }, "wordpress-cms"],
+    [{ affected: [{ affectedData: [{ vendor: "Drupal", product: "Drupal core" }] }] }, "wordpress-cms"],
+    [{ affected: [{ affectedData: [{ product: "Jenkins Example Plugin" }] }] }, "enterprise-apps"],
+    [{ sourceIdentifier: "security@wordfence.com" }, "wordpress-cms"],
+    [{ descriptions: [{ lang: "en", value: "A flaw in a router's firmware." }] }, "iot-firmware"],
+  ])("ranks OSV registry packages after products and descriptions: %j", (overrides, expected) => {
+    expect(classify(cve({ sources: ["cve", "osv"], ...overrides }))).toBe(expected);
+  });
 });

@@ -25,7 +25,7 @@ export interface NvdCve {
 
 export interface Cve extends Omit<NvdCve, "published"> {
   publishedAt: string;
-  sources: ("cve" | "nvd")[];
+  sources: ("cve" | "nvd" | "osv")[];
 }
 
 export interface CveRecord {
@@ -50,6 +50,20 @@ interface CveContainer {
     version?: string;
     baseScore?: number;
   }>>[];
+}
+
+export interface OsvRecord {
+  id: string;
+  modified: string;
+  cves: string[];
+  packages: { ecosystem: string; name: string }[];
+}
+
+export interface OsvState {
+  date: string;
+  cursor: string | null;
+  gap: boolean;
+  records: OsvRecord[];
 }
 
 export interface CvssScore {
@@ -82,6 +96,8 @@ export interface Snapshot {
   verdict: "YES" | "NO";
   totals: { published: number; critical: number; high: number; unscored: number };
   categories: CategorySnapshot[];
+  // Absent from snapshots stored before OSV enrichment existed.
+  osv?: { complete: boolean; through: string | null };
 }
 
 export interface SnapshotView {

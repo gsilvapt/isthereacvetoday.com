@@ -78,6 +78,8 @@ export function classify(cve: Cve): CategoryId {
   if (/\b(?:npm|python|pypi|ruby|rust|go|golang|composer|nuget) (?:package|crate|module|gem)\b|\b(?:javascript|python|ruby|rust|go|php|java|c\+\+) (?:library|framework)\b|\b(?:open.source|shared) library\b/i.test(lead)) {
     return "libraries";
   }
+  // OSV packages come only from package registries.
+  if (cve.sources.includes("osv")) return "libraries";
 
   if (cpes.some((cpe) => /^(?:cpe:2\.3:o:|cpe:\/o:)/.test(cpe))) return "operating-systems";
   if (cpes.some((cpe) => /^(?:cpe:2\.3:h:|cpe:\/h:)/.test(cpe))) return "iot-firmware";

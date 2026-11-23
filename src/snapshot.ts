@@ -4,7 +4,7 @@ import type { Cve, CvssScore, Snapshot, SnapshotView } from "./types";
 export const SNAPSHOT_KEY = "today";
 export const STALE_AFTER_MS = 90 * 60 * 1000;
 
-export function buildSnapshot(cves: Cve[], now: Date): Snapshot {
+export function buildSnapshot(cves: Cve[], now: Date, osv: Snapshot["osv"]): Snapshot {
   const snapshot: Snapshot = {
     date: now.toISOString().slice(0, 10),
     updatedAt: now.toISOString(),
@@ -13,6 +13,7 @@ export function buildSnapshot(cves: Cve[], now: Date): Snapshot {
     categories: CATEGORIES.map((category) => ({
       ...category, critical: 0, high: 0, maxScore: null, cves: [],
     })),
+    osv,
   };
   const startOfDay = Date.parse(`${snapshot.date}T00:00:00.000Z`);
   const seen = new Set<string>();
@@ -104,7 +105,9 @@ function affectedSoftware(cve: Cve): string[] {
       if (!validProduct && !validPackage) continue;
       const existing = software.find((item) =>
         (validPackage && item.packageName.toLowerCase() === validPackage.toLowerCase()) ||
-        (validProduct && item.product.toLowerCase() === validProduct.toLowerCase() && (!validPackage || !item.packageName)),
+        (validProduct && item.product.toLowerCase() === validProduct.toLowerCase() && (!validPackage || !item.packageName)) ||
+        // OSV supplies bare package names, which often repeat a CNA product name.
+        (!validProduct && !item.packageName && item.product.toLowerCase() === validPackage.toLowerCase()),
       );
       if (existing) {
         existing.product ||= validProduct;

@@ -1,4 +1,6 @@
-import type { Cve, NvdCve } from "../src/types";
+import type { Cve, NvdCve, Snapshot } from "../src/types";
+
+export const completeOsv: Snapshot["osv"] = { complete: true, through: "2026-11-19T08:30:00.000000000Z" };
 
 export function cve(overrides: Partial<Cve> = {}): Cve {
   return {

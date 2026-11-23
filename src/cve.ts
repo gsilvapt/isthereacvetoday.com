@@ -1,4 +1,4 @@
-import type { Cve, CveRecord, NvdCve } from "./types";
+import type { Cve, CveRecord, NvdCve, OsvRecord } from "./types";
 
 const API_URL = "https://vulnerability.circl.lu/api/vulnerability/";
 const PAGE_SIZE = 100;
@@ -44,8 +44,14 @@ export async function fetchCveRecords(now: Date): Promise<CveRecord[]> {
   throw new Error("CVE feed pagination exceeded the free-tier subrequest budget");
 }
 
-export function mergeCveRecords(records: CveRecord[], nvdCves: NvdCve[]): Cve[] {
+export function mergeCveRecords(records: CveRecord[], nvdCves: NvdCve[], osvRecords: OsvRecord[]): Cve[] {
   const nvdById = new Map(nvdCves.map((cve) => [cve.id.toUpperCase(), cve]));
+  const osvPackagesById = new Map<string, { packageName: string }[]>();
+  for (const record of osvRecords) {
+    for (const id of record.cves) {
+      osvPackagesById.set(id, [...(osvPackagesById.get(id) ?? []), ...record.packages.map(({ name }) => ({ packageName: name }))]);
+    }
+  }
   const latestRecords = new Map<string, { record: CveRecord; revisedAt: number }>();
   for (const record of records) {
     const id = record.cveMetadata.cveId.toUpperCase();
@@ -84,14 +90,23 @@ export function mergeCveRecords(records: CveRecord[], nvdCves: NvdCve[]): Cve[] 
       }
     }
 
+    const sources: Cve["sources"] = nvd ? ["cve", "nvd"] : ["cve"];
+    const affected: NonNullable<Cve["affected"]> = [{ affectedData: cna.affected }, ...(nvd?.affected ?? [])];
+    // Advisories from several databases often alias the same CVE. The software labels merge repeated names.
+    const osvPackages = osvPackagesById.get(id) ?? [];
+    if (osvPackages.length) {
+      sources.push("osv");
+      affected.push({ affectedData: osvPackages });
+    }
+
     cves.push({
       id,
       publishedAt: new Date(parseTimestamp(metadata.datePublished)).toISOString(),
-      sources: nvd ? ["cve", "nvd"] : ["cve"],
+      sources,
       sourceIdentifier: nvd?.sourceIdentifier ?? cna.providerMetadata?.orgId ?? metadata.assignerOrgId,
       vulnStatus: metadata.state,
       descriptions: cna.descriptions?.some((entry) => entry.lang === "en") ? cna.descriptions : nvd?.descriptions,
-      affected: [{ affectedData: cna.affected }, ...(nvd?.affected ?? [])],
+      affected,
       configurations: nvd?.configurations,
       metrics,
     });
